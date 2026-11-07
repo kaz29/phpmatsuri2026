@@ -42,7 +42,13 @@ class Debug extends Command
             return Command::FAILURE;
         }
 
-        $this->debug(realpath($target));
+        $path = realpath($target);
+        if ($path === false || !is_file($path)) {
+            $output->writeln('ターゲットファイルが見つかりません: ' . $target);
+            return Command::FAILURE;
+        }
+
+        $this->debug($path);
 
         return Command::SUCCESS;
     }
