@@ -67,7 +67,8 @@ class Debug extends Command
         echo $tmp . PHP_EOL;
 
         Debugger::$lines = file($file);
-    
+        Debugger::$hookLines = $this->rewriter->hookLines;
+
         // 引数で渡して include → ローカル変数を汚さない
         (static function () { include func_get_arg(0); })($tmp);
     }

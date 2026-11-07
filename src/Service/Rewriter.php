@@ -7,6 +7,9 @@ use PhpParser\{Node, NodeTraverser, NodeVisitorAbstract, ParserFactory};
 
 class Rewriter
 {
+    /** @var int[] 直近の rewrite() で __dbg を挿入した行番号（昇順） */
+    public array $hookLines = [];
+
     public function __construct(
         private string $tempDir = '/tmp'
     ) {}
@@ -68,6 +71,18 @@ class Rewriter
         $t = new NodeTraverser();
         $t->addVisitor($visitor);
         $t->traverse([$root]);
+
+        // ブレークポイントをずらすために、フックを入れた行の一覧を残す
+        $lines = [];
+        foreach ($inserts as $strs) {
+            foreach ($strs as $s) {
+                if (preg_match('/^__dbg\((\d+),/', $s, $m)) {
+                    $lines[(int) $m[1]] = true;
+                }
+            }
+        }
+        $this->hookLines = array_keys($lines);
+        sort($this->hookLines);
 
         // 後ろから挿入すると前方の位置がずれない
         krsort($inserts);

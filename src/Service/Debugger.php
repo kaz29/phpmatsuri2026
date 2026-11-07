@@ -10,6 +10,21 @@ final class Debugger
     public static int $targetDepth = 0;              // next/out の基準深さ
     public static array $breakpoints = [];           // [line => true]
     public static array $lines = [];                 // 元ソース（表示用）
+    public static array $hookLines = [];             // __dbg が入っている行（昇順）
+
+    /**
+     * 指定行以降で最初にフックがある行を返す（} だけの行や空行に置かれたブレークポイントをずらす）
+     * 本物の Xdebug も同様に調整し、breakpoint_set の応答で実際の行を返す
+     */
+    public static function resolveBreakpointLine(int $line): ?int
+    {
+        foreach (self::$hookLines as $hook) {
+            if ($hook >= $line) {
+                return $hook;
+            }
+        }
+        return null;
+    }
 
     public static function shouldPause(int $line): bool
     {
@@ -35,7 +50,16 @@ final class Debugger
                 case 'n': self::$mode = 'next'; self::$targetDepth = count(self::$frames); return;
                 case 'o': self::$mode = 'out';  self::$targetDepth = count(self::$frames); return;
                 case 'c': self::$mode = 'run';  return;
-                case 'b': self::$breakpoints[(int)$arg] = true; echo "breakpoint at $arg\n"; break;
+                case 'b':
+                    $req = (int) $arg;
+                    $bp = self::resolveBreakpointLine($req);
+                    if ($bp === null) {
+                        echo "line $req 以降に止まれる行がありません\n";
+                    } else {
+                        self::$breakpoints[$bp] = true;
+                        echo $bp === $req ? "breakpoint at $bp\n" : "breakpoint at $bp (line $req から移動)\n";
+                    }
+                    break;
                 case 'p': var_dump($vars[ltrim($arg, '$')] ?? null); break;
                 case 'l': foreach ($vars as $k => $v) echo "\$$k = ", json_encode($v), "\n"; break;
                 case 'bt':
