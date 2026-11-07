@@ -64,6 +64,15 @@ class Debug extends Command
                 unlink($tmp);
             }
         });
+        // Ctrl+C（SIGINT）はそのままだとシャットダウン関数が動かないので、exit に変換する
+        // 入力待ちの最中でもハンドラが動くように、Debugger::prompt() は stream_select で待っている
+        if (function_exists('pcntl_signal')) {
+            pcntl_async_signals(true);
+            pcntl_signal(SIGINT, static function (): void {
+                echo PHP_EOL;
+                exit(130);
+            }, false); // システムコールを自動で再開しない（select はどちらでも EINTR で戻るので念のため）
+        }
         echo $tmp . PHP_EOL;
 
         Debugger::$lines = file($file);

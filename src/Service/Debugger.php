@@ -38,11 +38,30 @@ final class Debugger
             };
     }
 
+    /**
+     * 1行読む。入力待ちの最中でも Ctrl+C（SIGINT）で抜けられるようにしてある
+     *
+     * - readline()（libedit）は入力待ち中の SIGINT を握りつぶす
+     * - fgets() も EINTR のとき read を1回やり直すので、1回目の Ctrl+C が効かない
+     * - stream_select() はやり直さずに戻るので、そこで pcntl のハンドラが動く
+     */
+    private static function prompt(string $prompt): string|false
+    {
+        echo $prompt;
+        do {
+            $r = [STDIN];
+            $w = $e = null;
+            $ready = @stream_select($r, $w, $e, null);
+        } while ($ready === false || $ready === 0);
+
+        return fgets(STDIN);
+    }
+
     public static function repl(int $line, array $vars): void
     {
         printf("\033[33m%s:%d\033[0m  %s\n", end(self::$frames)[0], $line, trim(self::$lines[$line - 1]));
         while (true) {
-            $in = readline('(dbg) ');
+            $in = self::prompt('(dbg) ');
             if ($in === false) exit;
             [$cmd, $arg] = array_pad(explode(' ', trim($in), 2), 2, null);
             switch ($cmd) {
