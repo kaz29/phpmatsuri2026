@@ -357,10 +357,10 @@ final class Dbgp
         return $frames[$depth][2];
     }
 
-    /** `$items['a']` や `$o->p[0]` のような fullname をたどって値を取り出す */
+    /** `$items['a']` や `$o->p[0]` のような fullname をたどって値を取り出す（変数名は日本語も可。\w だと /u なしでは漢字にマッチしない） */
     private function resolve(string $fullname, int $depth): mixed
     {
-        if (!preg_match('/^\$(\w+)(.*)$/s', $fullname, $m)) {
+        if (!preg_match('/^\$([\p{L}\p{N}_]+)(.*)$/su', $fullname, $m)) {
             throw new DbgpError("can not get property: $fullname", 300);
         }
         $vars = $this->vars($depth);
@@ -376,7 +376,7 @@ final class Dbgp
             } elseif (preg_match('/^\[\'((?:[^\'\\\\]|\\\\.)*)\'\](.*)$/s', $rest, $m)
                 || preg_match('/^\["((?:[^"\\\\]|\\\\.)*)"\](.*)$/s', $rest, $m)) {
                 $key = stripslashes($m[1]);
-            } elseif (preg_match('/^->(\w+)(.*)$/s', $rest, $m)) {
+            } elseif (preg_match('/^->([\p{L}\p{N}_]+)(.*)$/su', $rest, $m)) {
                 $props = self::objectProps($value);
                 if (!isset($props[$m[1]])) {
                     throw new DbgpError("can not get property: $fullname", 300);
@@ -462,7 +462,7 @@ final class Dbgp
 
     private static function shortName(string $fullname): string
     {
-        if (preg_match('/(?:\[\'?((?:[^\'\\\\]|\\\\.)*?)\'?\]|->(\w+))$/', $fullname, $m)) {
+        if (preg_match('/(?:\[\'?((?:[^\'\\\\]|\\\\.)*?)\'?\]|->([\p{L}\p{N}_]+))$/u', $fullname, $m)) {
             return ($m[2] ?? '') !== '' ? $m[2] : stripslashes($m[1]);
         }
         return $fullname;
