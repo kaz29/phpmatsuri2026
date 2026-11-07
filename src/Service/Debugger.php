@@ -5,7 +5,8 @@ namespace MiniXDebug\Service;
 
 final class Debugger
 {
-    public static array $frames = [['{main}', 0, []]]; // [関数名, 現在行, 最後の __dbg で受け取った変数]
+    public static array $frames = [['{main}', 0, [], 0]]; // [関数名, 現在行, 最後の __dbg で受け取った変数, 呼び出し番号]
+    public static int $callSeq = 0;                  // 関数を呼ぶたびに増やす（同じ深さでも別の呼び出しを見分ける）
     public static string $mode = 'step';             // step | next | out | run
     public static int $targetDepth = 0;              // next/out の基準深さ
     public static array $breakpoints = [];           // [line => true]
@@ -13,6 +14,7 @@ final class Debugger
     public static array $hookLines = [];             // __dbg が入っている行（昇順）
     public static string $file = '';                 // デバッグ対象（元ファイル）の絶対パス
     public static ?Dbgp $dbgp = null;                // DBGp で IDE につないでいるとき。null なら stdin の REPL
+    public static ?Commentator $commentator = null;  // 実況デバッガ
 
     /** __dbg から呼ばれる。止まるべき文なら IDE か REPL に制御を渡す */
     public static function hook(int $line, array $vars): void
@@ -24,6 +26,8 @@ final class Debugger
             return;
         }
         if (self::$dbgp !== null) {
+            // 実況は止まったと IDE に伝える前に送る（デバッグコンソールで停止より先に出る）
+            self::$commentator?->comment($line, self::$frames, isset(self::$breakpoints[$line]));
             self::$dbgp->onBreak();
         } else {
             self::repl($line, $vars);
@@ -91,6 +95,7 @@ final class Debugger
     public static function repl(int $line, array $vars): void
     {
         printf("\033[33m%s:%d\033[0m  %s\n", end(self::$frames)[0], $line, trim(self::$lines[$line - 1]));
+        self::$commentator?->comment($line, self::$frames, isset(self::$breakpoints[$line]));
         while (true) {
             $in = self::prompt('(dbg) ');
             if ($in === false) exit;

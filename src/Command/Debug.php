@@ -6,6 +6,7 @@ namespace MiniXDebug\Command;
 use MiniXDebug\Service\Rewriter;
 use MiniXDebug\Service\Debugger;
 use MiniXDebug\Service\Dbgp;
+use MiniXDebug\Service\Commentator;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -34,6 +35,7 @@ class Debug extends Command
             ->addOption('target', 't', InputOption::VALUE_REQUIRED, 'デバッグ対象ファイル')
             ->addOption('dump', 'd', InputOption::VALUE_REQUIRED, '書き出すファイルパス')
             ->addOption('dbgp', null, InputOption::VALUE_OPTIONAL, 'DBGp で IDE に接続する（host:port）', false)
+            ->addOption('commentary', null, InputOption::VALUE_REQUIRED, '実況（on: say で読み上げ / text: 文字で表示 / off）', 'off')
         ;
     }
 
@@ -62,7 +64,17 @@ class Debug extends Command
             }
         }
 
+        $commentary = $input->getOption('commentary');
+        if (!in_array($commentary, ['on', 'off', 'text'], true)) {
+            $output->writeln('--commentary は on / off / text のどれかを指定してください: ' . $commentary);
+            return Command::FAILURE;
+        }
+
         $dbgp = $input->getOption('dbgp');
+        if ($commentary !== 'off') {
+            Debugger::$commentator = new Commentator($commentary);
+        }
+
         if ($dbgp !== false) {
             // --dbgp だけなら VS Code の既定（127.0.0.1:9003）。IDE 側が listen していて、こちらから接続しに行く
             $address = $dbgp ?? '127.0.0.1:9003';

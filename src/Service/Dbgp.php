@@ -27,6 +27,9 @@ final class Dbgp
     private int $maxDepth = 1;
     private int $maxData = 1024;
 
+    /** IDE が notify_ok を有効にしたら、<notify name="user"> でデバッグコンソールにメッセージを出せる */
+    private bool $notifyOk = false;
+
     /** @param resource $socket */
     private function __construct(private $socket, private string $file) {}
 
@@ -138,6 +141,8 @@ final class Dbgp
                     'breakpoint_types'  => 'line',
                     // 1 にすると、IDE は breakpoint_set の後に breakpoint_get でずらした行を取りに来る
                     'resolved_breakpoints' => '1',
+                    // 1 にすると、<notify name="user"> がデバッグコンソールに出る（実況デバッガで使う）
+                    'notify_ok'         => '1',
                     default             => null,
                 };
                 $this->respond($cmd, $txn, sprintf('feature="%s" supported="%d"', self::attr($name), $value !== null),
@@ -151,6 +156,7 @@ final class Dbgp
                     'max_children' => $this->maxChildren = max(1, (int) $value),
                     'max_depth'    => $this->maxDepth = max(0, (int) $value),
                     'max_data'     => $this->maxData = (int) $value,
+                    'notify_ok'    => $this->notifyOk = $value === '1',
                     default        => null, // ほかの設定は受け付けたことにする
                 };
                 $this->respond($cmd, $txn, sprintf('feature="%s" success="1"', self::attr($name)));
@@ -258,6 +264,24 @@ final class Dbgp
             default:
                 throw new DbgpError("unimplemented command: $cmd", 4);
         }
+    }
+
+    /**
+     * VS Code のデバッグコンソールにメッセージを出す。IDE が notify_ok を有効にしていなければ false
+     *
+     * 型を string にすると前後に " が付くので、独自の型名にしてそのまま表示させる。
+     * xdebug:location がないと拡張側でエラーになるので、今の行を付ける
+     */
+    public function notifyUser(string $message, int $line): bool
+    {
+        if (!$this->notifyOk) {
+            return false;
+        }
+        $this->send(sprintf(
+            '<notify %s name="user"><property type="実況" children="0"><![CDATA[%s]]></property><xdebug:location filename="%s" lineno="%d"/></notify>',
+            self::NS, str_replace(']]>', ']]]]><![CDATA[>', $message), self::attr(self::uri($this->file)), $line,
+        ));
+        return true;
     }
 
     // ------------------------------------------------------------------
