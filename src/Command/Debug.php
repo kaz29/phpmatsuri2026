@@ -42,13 +42,7 @@ class Debug extends Command
             return Command::FAILURE;
         }
 
-        if (realpath($target) !== $target) {
-            throw new \Exception('このファイルはデバッグできません');
-        }
-
-        $output->writeln('Target file: ' . $target);
-
-        $this->debug($target);
+        $this->debug(realpath($target));
 
         return Command::SUCCESS;
     }
@@ -58,12 +52,17 @@ class Debug extends Command
         $t = $this->rewriter->rewrite($file);
         $tmp = tempnam(sys_get_temp_dir(), 'dbg');
         file_put_contents($tmp, $t);
+        // REPL の exit や対象スクリプトの致命的エラーで抜けても一時ファイルを消す
+        register_shutdown_function(static function () use ($tmp): void {
+            if (is_file($tmp)) {
+                unlink($tmp);
+            }
+        });
         echo $tmp . PHP_EOL;
 
         Debugger::$lines = file($file);
     
         // 引数で渡して include → ローカル変数を汚さない
         (static function () { include func_get_arg(0); })($tmp);
-        unlink($tmp);
     }
 }
