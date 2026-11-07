@@ -85,7 +85,7 @@ final class Commentator
 
         $next = ltrim(Debugger::$lines[$line - 1] ?? '');
         if (str_starts_with($next, 'return')) {
-            $words[] = 'さあ return、return です！';
+            $words[] = 'さあ リターン、リターン です！';
         } elseif (str_starts_with($next, 'echo')) {
             $words[] = '出力が来ます！';
         }
