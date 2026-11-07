@@ -37,6 +37,7 @@ final class Debugger
     /** 対象スクリプトが最後まで実行されたとき */
     public static function finish(): void
     {
+        self::$commentator?->drain(); // 最後の実況（AI の生成中）を言い切ってから終わる
         self::$dbgp?->onFinish();
     }
 
@@ -83,13 +84,19 @@ final class Debugger
     private static function prompt(string $prompt): string|false
     {
         echo $prompt;
-        do {
-            $r = [STDIN];
+        while (true) {
+            // AI の実況を生成中なら、その出力も一緒に待つ（入力を待っている間に実況が返ってくる）
+            $pending = self::$commentator?->pendingStream();
+            $r = $pending !== null ? [STDIN, $pending] : [STDIN];
             $w = $e = null;
-            $ready = @stream_select($r, $w, $e, null);
-        } while ($ready === false || $ready === 0);
-
-        return fgets(STDIN);
+            $ready = @stream_select($r, $w, $e, $pending !== null ? 1 : null);
+            if ($pending !== null) {
+                self::$commentator->poll(); // 読めるようになったか、1秒ごとにタイムアウトの判定
+            }
+            if ($ready !== false && in_array(STDIN, $r, true)) {
+                return fgets(STDIN);
+            }
+        }
     }
 
     public static function repl(int $line, array $vars): void

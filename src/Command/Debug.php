@@ -36,6 +36,7 @@ class Debug extends Command
             ->addOption('dump', 'd', InputOption::VALUE_REQUIRED, '書き出すファイルパス')
             ->addOption('dbgp', null, InputOption::VALUE_OPTIONAL, 'DBGp で IDE に接続する（host:port）', false)
             ->addOption('commentary', null, InputOption::VALUE_REQUIRED, '実況（on: say で読み上げ / text: 文字で表示 / off）', 'off')
+            ->addOption('commentary-ai', null, InputOption::VALUE_NONE, '実況の文章を Claude Haiku に作らせる（commentator/CLAUDE.md）')
         ;
     }
 
@@ -71,8 +72,11 @@ class Debug extends Command
         }
 
         $dbgp = $input->getOption('dbgp');
+        $ai = (bool) $input->getOption('commentary-ai');
         if ($commentary !== 'off') {
-            Debugger::$commentator = new Commentator($commentary);
+            Debugger::$commentator = new Commentator($commentary, $ai);
+        } elseif ($ai) {
+            $output->writeln('--commentary-ai は --commentary=on か text と一緒に指定してください（今回は実況しません）');
         }
 
         if ($dbgp !== false) {

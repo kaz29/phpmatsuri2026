@@ -507,10 +507,16 @@ final class Dbgp
     private function readCommand(): ?string
     {
         while (($pos = strpos($this->buffer, "\0")) === false) {
-            $r = [$this->socket];
+            // AI の実況を生成中なら、その出力も一緒に待つ（IDE のコマンドを待っている間に実況が返ってくる）
+            $pending = Debugger::$commentator?->pendingStream();
+            $r = $pending !== null ? [$this->socket, $pending] : [$this->socket];
             $w = $e = null;
             // Ctrl+C（SIGINT）のハンドラが動けるように、select で待つ
-            if (@stream_select($r, $w, $e, null) === false) {
+            $ready = @stream_select($r, $w, $e, $pending !== null ? 1 : null);
+            if ($pending !== null) {
+                Debugger::$commentator->poll(); // 読めるようになったか、1秒ごとにタイムアウトの判定
+            }
+            if ($ready === false || !in_array($this->socket, $r, true)) {
                 continue;
             }
             $chunk = fread($this->socket, 8192);
