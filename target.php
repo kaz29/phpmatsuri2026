@@ -15,3 +15,9 @@ foreach ($items as $key => $value) {
     $total = $total + twice($value);
 }
 echo "total = $total\n";
+
+$func = function (string $name) {
+    echo "Hello {$name}\n";
+};
+
+$func('HAKONE');
