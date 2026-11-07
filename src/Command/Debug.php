@@ -19,7 +19,7 @@ use Symfony\Component\Console\Input\InputOption;
 class Debug extends Command
 {
     protected Rewriter $rewriter;
-
+    protected ?string $dump = null;
     public function __construct()
     {
         parent::__construct();
@@ -32,6 +32,7 @@ class Debug extends Command
         $this
             ->setDescription('デバッガを起動する')
             ->addOption('target', 't', InputOption::VALUE_REQUIRED, 'デバッグ対象ファイル')
+            ->addOption('dump', 'd', InputOption::VALUE_REQUIRED, '書き出すファイルパス')
             ->addOption('dbgp', null, InputOption::VALUE_OPTIONAL, 'DBGp で IDE に接続する（host:port）', false)
         ;
     }
@@ -39,6 +40,7 @@ class Debug extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $target = $input->getOption('target');
+        $this->dump = $input->getOption('dump');
         if (empty($target)) {
             $output->writeln('ターゲットファイルが指定されていません。');
             return Command::FAILURE;
@@ -73,6 +75,11 @@ class Debug extends Command
         $rewritten = $this->rewriter->rewrite($file);
         $tmp = tempnam(sys_get_temp_dir(), 'dbg');
         file_put_contents($tmp, $rewritten);
+
+        if ($this->dump !== null) {
+            file_put_contents($this->dump, $rewritten);
+        }
+        
         // REPL の exit や対象スクリプトの致命的エラーで抜けても一時ファイルを消す
         register_shutdown_function(static function () use ($tmp): void {
             if (is_file($tmp)) {
