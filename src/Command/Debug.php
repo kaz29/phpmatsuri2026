@@ -52,6 +52,16 @@ class Debug extends Command
             return Command::FAILURE;
         }
 
+        // 書き出し先がまだないときは realpath が false になるので、ディレクトリ側で比べる
+        if ($this->dump !== null) {
+            $dumpPath = realpath($this->dump)
+                ?: realpath(dirname($this->dump)) . DIRECTORY_SEPARATOR . basename($this->dump);
+            if ($dumpPath === $path) {
+                $output->writeln('--dump にターゲットファイルと同じパスは指定できません: ' . $this->dump);
+                return Command::FAILURE;
+            }
+        }
+
         $dbgp = $input->getOption('dbgp');
         if ($dbgp !== false) {
             // --dbgp だけなら VS Code の既定（127.0.0.1:9003）。IDE 側が listen していて、こちらから接続しに行く
