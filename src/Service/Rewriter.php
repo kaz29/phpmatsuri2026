@@ -26,14 +26,70 @@ class Rewriter
 
     protected function _rewrite(string $code): string
     {
-        $ast = (new ParserFactory)->createForHostVersion()->parse($code);
+        $parser = (new ParserFactory)->createForHostVersion();
+        $ast = $parser->parse($code);
         $inserts = []; // [filePos => 挿入文字列]
 
-        $visitor = new class($inserts, $code) extends NodeVisitorAbstract {
-            public function __construct(private array &$inserts, private string $code) {}
+        $visitor = new class($inserts, $code, $parser->getTokens()) extends NodeVisitorAbstract {
+            /** @param \PhpParser\Token[] $tokens */
+            public function __construct(private array &$inserts, private string $code, private array $tokens) {}
+
+            /** 開く側の挿入：外側のノードが先に訪問されるので、後ろに足すと外→内の順になる */
+            private function open(int $pos, string $s): void
+            {
+                $this->inserts[$pos][] = $s;
+            }
+
+            /** 閉じる側の挿入：内側のノードが後から訪問されるので、前に足すと内→外の順になる */
+            private function close(int $pos, string $s): void
+            {
+                $this->inserts[$pos] ??= [];
+                array_unshift($this->inserts[$pos], $s);
+            }
+
+            /**
+             * 制御構文の本体が {} なしか（`if ($x) echo 1;` など）
+             * 本体の最初の文の直前にある（空白・コメント以外の）トークンが `{` でも `:`（代替構文）でもなければ {} なし
+             */
+            private function isBraceless(Node $node): bool
+            {
+                $i = $node->stmts[0]->getStartTokenPos() - 1;
+                while ($i >= 0 && $this->tokens[$i]->isIgnorable()) {
+                    $i--;
+                }
+                return $i < 0 || !in_array($this->tokens[$i]->text, ['{', ':'], true);
+            }
 
             public function enterNode(Node $node)
             {
+                // (b) 関数本体を enter / try-finally leave で包む
+                //     最初の文の __dbg より前に enter を入れたいので、(a) より先に処理する
+                if ($node instanceof Node\Stmt\Function_ || $node instanceof Node\Stmt\ClassMethod) {
+                    if ($node->stmts === null) return; // abstract
+                    $name  = $node->name->toString();
+                    $from  = $node->params ? end($node->params)->getEndFilePos() : $node->getStartFilePos();
+                    $open  = strpos($this->code, '{', $from);       // 本体の {
+                    $close = $node->getEndFilePos();                // 本体の }
+                    $this->open($open + 1, "__dbg_enter('$name', {$node->getStartLine()}); try {");
+                    $this->close($close, "} finally { __dbg_leave(); }");
+                }
+
+                // (c) {} なしの制御構文の本体を {} で包む
+                //     `if ($x) echo "A";` に __dbg を入れると `if ($x) __dbg(...);echo "A";` になり、
+                //     echo が条件に関係なく実行されてしまうため
+                if (($node instanceof Node\Stmt\If_
+                        || $node instanceof Node\Stmt\ElseIf_
+                        || $node instanceof Node\Stmt\Else_
+                        || $node instanceof Node\Stmt\For_
+                        || $node instanceof Node\Stmt\Foreach_
+                        || $node instanceof Node\Stmt\While_
+                        || $node instanceof Node\Stmt\Do_)
+                    && $node->stmts !== []
+                    && $this->isBraceless($node)) {
+                    $this->open($node->stmts[0]->getStartFilePos(), '{');
+                    $this->close(end($node->stmts)->getEndFilePos() + 1, '}');
+                }
+
                 // (a) 「文のリスト」を持つノードの各文の前に __dbg を挿入
                 if (property_exists($node, 'stmts') && is_array($node->stmts)) {
                     foreach ($node->stmts as $stmt) {
@@ -45,19 +101,8 @@ class Rewriter
                             continue; // 宣言系は「実行される文」じゃないのでスキップ
                         }
                         $line = $stmt->getStartLine();
-                        $this->inserts[$stmt->getStartFilePos()][] =
-                            "__dbg($line, get_defined_vars());";
+                        $this->open($stmt->getStartFilePos(), "__dbg($line, get_defined_vars());");
                     }
-                }
-                // (b) 関数本体を enter / try-finally leave で包む
-                if ($node instanceof Node\Stmt\Function_ || $node instanceof Node\Stmt\ClassMethod) {
-                    if ($node->stmts === null) return; // abstract
-                    $name  = $node->name->toString();
-                    $from  = $node->params ? end($node->params)->getEndFilePos() : $node->getStartFilePos();
-                    $open  = strpos($this->code, '{', $from);       // 本体の {
-                    $close = $node->getEndFilePos();                // 本体の }
-                    $this->inserts[$open + 1][] = "__dbg_enter('$name', {$node->getStartLine()}); try {";
-                    $this->inserts[$close][]    = "} finally { __dbg_leave(); }";
                 }
             }
         };
