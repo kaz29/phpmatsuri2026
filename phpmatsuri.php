@@ -5,7 +5,7 @@ function info(int $year, string $location): string {
     return "PHPMatsuri {$year} at {$location}";
 }
 
-$phpmatsuri = [
+$PHP祭り = [
     [ 'year' => 2010, 'location' => 'Tokyo'],
     [ 'year' => 2011, 'location' => 'Osaka'],
     [ 'year' => 2012, 'location' => 'Fukuoka'],
@@ -13,6 +13,6 @@ $phpmatsuri = [
     [ 'year' => 2026, 'location' =>  'Hakone'],
 ];
 
-foreach ($phpmatsuri as $event) {
+foreach ($PHP祭り as $event) {
     echo info($event['year'], $event['location']) . "\n";
 }
