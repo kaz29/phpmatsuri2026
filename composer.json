@@ -1,5 +1,16 @@
 {
     "require": {
-        "nikic/php-parser": "^5.9"
+        "nikic/php-parser": "^5.9",
+        "symfony/console": "^8.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "MiniXDebug\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MiniXDebug\\Test\\": "tests/"
+        }
     }
 }
