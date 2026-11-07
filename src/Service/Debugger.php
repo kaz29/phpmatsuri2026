@@ -5,12 +5,43 @@ namespace MiniXDebug\Service;
 
 final class Debugger
 {
-    public static array $frames = [['{main}', 0]];   // [関数名, 現在行]
+    public static array $frames = [['{main}', 0, []]]; // [関数名, 現在行, 最後の __dbg で受け取った変数]
     public static string $mode = 'step';             // step | next | out | run
     public static int $targetDepth = 0;              // next/out の基準深さ
     public static array $breakpoints = [];           // [line => true]
     public static array $lines = [];                 // 元ソース（表示用）
     public static array $hookLines = [];             // __dbg が入っている行（昇順）
+    public static string $file = '';                 // デバッグ対象（元ファイル）の絶対パス
+    public static ?Dbgp $dbgp = null;                // DBGp で IDE につないでいるとき。null なら stdin の REPL
+
+    /** __dbg から呼ばれる。止まるべき文なら IDE か REPL に制御を渡す */
+    public static function hook(int $line, array $vars): void
+    {
+        $top = array_key_last(self::$frames);
+        self::$frames[$top][1] = $line;
+        self::$frames[$top][2] = $vars;
+        if (!self::shouldPause($line)) {
+            return;
+        }
+        if (self::$dbgp !== null) {
+            self::$dbgp->onBreak();
+        } else {
+            self::repl($line, $vars);
+        }
+    }
+
+    /** 対象スクリプトが最後まで実行されたとき */
+    public static function finish(): void
+    {
+        self::$dbgp?->onFinish();
+    }
+
+    /** ステップ実行の状態を設定する（REPL と DBGp で共通） */
+    public static function resume(string $mode): void
+    {
+        self::$mode = $mode;
+        self::$targetDepth = count(self::$frames);
+    }
 
     /**
      * 指定行以降で最初にフックがある行を返す（} だけの行や空行に置かれたブレークポイントをずらす）
@@ -65,10 +96,10 @@ final class Debugger
             if ($in === false) exit;
             [$cmd, $arg] = array_pad(explode(' ', trim($in), 2), 2, null);
             switch ($cmd) {
-                case 's': self::$mode = 'step'; return;
-                case 'n': self::$mode = 'next'; self::$targetDepth = count(self::$frames); return;
-                case 'o': self::$mode = 'out';  self::$targetDepth = count(self::$frames); return;
-                case 'c': self::$mode = 'run';  return;
+                case 's': self::resume('step'); return;
+                case 'n': self::resume('next'); return;
+                case 'o': self::resume('out');  return;
+                case 'c': self::resume('run');  return;
                 case 'b':
                     $req = (int) $arg;
                     $bp = self::resolveBreakpointLine($req);

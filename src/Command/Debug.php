@@ -5,6 +5,7 @@ namespace MiniXDebug\Command;
 
 use MiniXDebug\Service\Rewriter;
 use MiniXDebug\Service\Debugger;
+use MiniXDebug\Service\Dbgp;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -31,6 +32,7 @@ class Debug extends Command
         $this
             ->setDescription('デバッガを起動する')
             ->addOption('target', 't', InputOption::VALUE_REQUIRED, 'デバッグ対象ファイル')
+            ->addOption('dbgp', null, InputOption::VALUE_OPTIONAL, 'DBGp で IDE に接続する（host:port）', false)
         ;
     }
 
@@ -48,6 +50,19 @@ class Debug extends Command
             return Command::FAILURE;
         }
 
+        $dbgp = $input->getOption('dbgp');
+        if ($dbgp !== false) {
+            // --dbgp だけなら VS Code の既定（127.0.0.1:9003）。IDE 側が listen していて、こちらから接続しに行く
+            $address = $dbgp ?? '127.0.0.1:9003';
+            try {
+                Debugger::$dbgp = Dbgp::connect($address, $path);
+            } catch (\RuntimeException $e) {
+                $output->writeln($e->getMessage());
+                return Command::FAILURE;
+            }
+            $output->writeln("DBGp: $address に接続しました");
+        }
+
         $this->debug($path);
 
         return Command::SUCCESS;
@@ -55,9 +70,9 @@ class Debug extends Command
 
     protected function debug(string $file)
     {
-        $t = $this->rewriter->rewrite($file);
+        $rewritten = $this->rewriter->rewrite($file);
         $tmp = tempnam(sys_get_temp_dir(), 'dbg');
-        file_put_contents($tmp, $t);
+        file_put_contents($tmp, $rewritten);
         // REPL の exit や対象スクリプトの致命的エラーで抜けても一時ファイルを消す
         register_shutdown_function(static function () use ($tmp): void {
             if (is_file($tmp)) {
@@ -75,10 +90,16 @@ class Debug extends Command
         }
         echo $tmp . PHP_EOL;
 
+        Debugger::$file = $file;
         Debugger::$lines = file($file);
         Debugger::$hookLines = $this->rewriter->hookLines;
 
+        // IDE からブレークポイントなどを受け取り、run / step_into が来るまで待つ
+        Debugger::$dbgp?->handshake();
+
         // 引数で渡して include → ローカル変数を汚さない
         (static function () { include func_get_arg(0); })($tmp);
+
+        Debugger::finish();
     }
 }
