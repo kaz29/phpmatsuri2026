@@ -303,12 +303,11 @@ final class Commentator
     {
         $this->recent = array_slice([...$this->recent, $text], -2);
 
-        if ($this->mode === 'text') {
-            // VS Code につないでいるときはデバッグコンソールに出す。だめならターミナルに出す
-            if (Debugger::$dbgp?->notifyUser("🎙 「{$text}」\n", $line)) {
-                return;
-            }
+        // 文字はどちらのモードでも出す。VS Code につないでいるときはデバッグコンソール、だめならターミナル
+        if (!Debugger::$dbgp?->notifyUser("🎙 「{$text}」\n", $line)) {
             echo "\033[35m🎙 「{$text}」\033[0m\n";
+        }
+        if ($this->mode === 'text') {
             return;
         }
 
