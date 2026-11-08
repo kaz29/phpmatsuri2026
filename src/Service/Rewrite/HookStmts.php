@@ -19,8 +19,11 @@ class HookStmts implements RewriteInterface
                 || $stmt instanceof Node\Stmt\ClassLike
                 || $stmt instanceof Node\Stmt\ClassMethod
                 || $stmt instanceof Node\Stmt\Declare_
+                || $stmt instanceof Node\Stmt\Namespace_
                 || $stmt instanceof Node\Stmt\Nop) {
-                continue; // 宣言系は「実行される文」じゃないのでスキップ
+                // 宣言系は「実行される文」じゃないのでスキップ
+                // namespace は最初の文でないとエラーになるので、前に __dbg を入れてはいけない（中の文には入る）
+                continue;
             }
             $ctx->hook($stmt);
         }
