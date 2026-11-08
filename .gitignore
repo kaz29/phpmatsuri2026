@@ -6,3 +6,4 @@
 /vendor/
 .phpunit.result.cache
 /proto/
+*_dump.php

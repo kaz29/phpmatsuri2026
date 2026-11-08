@@ -17,8 +17,5 @@ foreach ($PHP祭り as $event) {
     echo info($event['year'], $event['location'], $event['option'] ?? null) . "\n";
 }
 
-
-
-
-
-echo "\n\e[41m    \e[43m    \e[42m    \e[46m    \e[44m    \e[45m    \e[41m    \e[43m    \e[42m    \e[46m    \e[44m    \e[45m    \e[41m    \e[43m    \e[42m    \e[46m    \e[44m    \e[0m\n\e[1;5;93;45m  🎉🎉  asumikam、PHP祭り reboot 主催してくれてありがとう！  🎉🎉   \e[0m\n\e[41m    \e[43m    \e[42m    \e[46m    \e[44m    \e[45m    \e[41m    \e[43m    \e[42m    \e[46m    \e[44m    \e[45m    \e[41m    \e[43m    \e[42m    \e[46m    \e[44m    \e[0m\n\n";
+$message = "\n\e[41m    \e[43m    \e[42m    \e[46m    \e[44m    \e[45m    \e[41m    \e[43m    \e[42m    \e[46m    \e[44m    \e[45m    \e[41m    \e[43m    \e[42m    \e[46m    \e[44m    \e[0m\n\e[1;5;93;45m  🎉🎉  asumikam、PHP祭り reboot 主催してくれてありがとう！  🎉🎉   \e[0m\n\e[41m    \e[43m    \e[42m    \e[46m    \e[44m    \e[45m    \e[41m    \e[43m    \e[42m    \e[46m    \e[44m    \e[45m    \e[41m    \e[43m    \e[42m    \e[46m    \e[44m    \e[0m\n\n";
+echo $message;

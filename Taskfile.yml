@@ -1,0 +1,11 @@
+version: '3'
+tasks:
+  add:
+    cmds:
+      - php src/main.php debug -t add.php --dbgp
+  matsuri:
+    cmds:
+      - php src/main.php debug -t phpmatsuri.php --commentary on --commentary-ai --dbgp
+  dump:
+    cmds:
+      - php src/main.php debug -t phpmatsuri.php --dump phpmatsuri_dump.php
