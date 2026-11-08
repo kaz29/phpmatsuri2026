@@ -412,7 +412,7 @@ final class Dbgp
             } else {
                 $type = sprintf('type="object" classname="%s"', self::attr($value::class));
                 foreach (self::objectProps($value) as $prop => [$facet, $v]) {
-                    $children[] = [$prop, "$fullname->$prop", $v, $facet];
+                    $children[] = [(string) $prop, "$fullname->$prop", $v, $facet]; // 数字だけの名前は int キーになるので文字列に戻す
                 }
             }
             $count = count($children);
@@ -448,8 +448,9 @@ final class Dbgp
             return [];
         }
         $props = [];
-        foreach ((array) $object as $key => $v) {
-            // (array) キャストすると private は "\0クラス名\0名前"、protected は "\0*\0名前" になる
+        // (array) キャストだと Closure などは [0 => 自分自身] になるので、get_mangled_object_vars を使う
+        // private は "\0クラス名\0名前"、protected は "\0*\0名前" というキーになる
+        foreach (get_mangled_object_vars($object) as $key => $v) {
             $parts = explode("\0", (string) $key);
             if (count($parts) === 3) {
                 $props[$parts[2]] = [$parts[1] === '*' ? 'protected' : 'private', $v];
