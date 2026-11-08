@@ -64,10 +64,17 @@ class Rewriter
             {
                 // (b) 関数本体を enter / try-finally leave で包む
                 //     最初の文の __dbg より前に enter を入れたいので、(a) より先に処理する
-                if ($node instanceof Node\Stmt\Function_ || $node instanceof Node\Stmt\ClassMethod) {
+                //     クロージャも同じように包む（アロー関数は本体に文がないので対象外）
+                if ($node instanceof Node\Stmt\Function_ || $node instanceof Node\Stmt\ClassMethod || $node instanceof Node\Expr\Closure) {
                     if ($node->stmts === null) return; // abstract
-                    $name  = $node->name->toString();
-                    $from  = $node->params ? end($node->params)->getEndFilePos() : $node->getStartFilePos();
+                    $name  = $node instanceof Node\Expr\Closure ? '{closure}' : $node->name->toString();
+                    // 本体の { は、引数・use・戻り値の型より後ろにある最初の {
+                    $from  = $node->getStartFilePos();
+                    foreach ([...$node->params, ...($node instanceof Node\Expr\Closure ? $node->uses : []), $node->returnType] as $part) {
+                        if ($part !== null) {
+                            $from = max($from, $part->getEndFilePos());
+                        }
+                    }
                     $open  = strpos($this->code, '{', $from);       // 本体の {
                     $close = $node->getEndFilePos();                // 本体の }
                     $this->open($open + 1, "__dbg_enter('$name', {$node->getStartLine()}); try {");
@@ -91,7 +98,8 @@ class Rewriter
                 }
 
                 // (a) 「文のリスト」を持つノードの各文の前に __dbg を挿入
-                if (property_exists($node, 'stmts') && is_array($node->stmts)) {
+                //     クラスの本体（プロパティ・定数・メソッドの宣言）は実行される文ではないので入れない
+                if (property_exists($node, 'stmts') && is_array($node->stmts) && !$node instanceof Node\Stmt\ClassLike) {
                     foreach ($node->stmts as $stmt) {
                         if ($stmt instanceof Node\Stmt\Function_
                             || $stmt instanceof Node\Stmt\ClassLike

@@ -282,7 +282,11 @@ final class Commentator
 
     private static function label(string $function): string
     {
-        return $function === '{main}' ? 'メイン' : $function;
+        return match ($function) {
+            '{main}'    => 'メイン',
+            '{closure}' => 'クロージャ',
+            default     => $function,
+        };
     }
 
     private function value(mixed $v): string
